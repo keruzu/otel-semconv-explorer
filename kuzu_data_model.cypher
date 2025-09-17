@@ -8,8 +8,8 @@ CREATE NODE TABLE IF NOT EXISTS Attribute(
     id STRING,
     stability STRING,
     brief STRING,
-    examples STRING,
-    note STRING,
+    examples STRING DEFAULT "",
+    note STRING DEFAULT "",
     PRIMARY KEY (id)
 );
 CREATE NODE TABLE IF NOT EXISTS Span(
@@ -17,7 +17,7 @@ CREATE NODE TABLE IF NOT EXISTS Span(
     span_kind STRING,
     stability STRING,
     brief STRING,
-    note STRING,
+    note STRING DEFAULT "",
     example STRING DEFAULT "",
     PRIMARY KEY (id)
 );

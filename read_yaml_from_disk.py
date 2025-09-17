@@ -16,23 +16,36 @@ log = logging.getLogger()
 
 
 # --- YAML Processing Function ---
-class SemanticConventionReader(object):
+class SemanticConventions(object):
     def __init__(self, log=None):
         self.path_start = -1
         self.log = log
+        self.reset()
 
-    def from_dir(self, base_path: str) -> dict:
+    def reset(self):
+        self.relations = dict(has_attribute={}, has_event=[])
+        self.nodes = dict(Metric={}, Entity={}, Span={}, AttributeGroup={}, Event={}, Attribute={})
+
+    def nodetype2node(self, section: dict) -> str:
+        """
+        Map OpenTelemetry 'type' field to our Cypher node table name
+        :return:
+        """
+        mappings = dict(metric='Metric', entity='Entity', span='Span', attribute_group='AttributeGroup', event='Event')
+        node_type = section.get('type')
+        return mappings.get(node_type)
+
+    def from_dir(self, base_path: str):
         """
         Reads all YAML files in a given directory and its subdirectories using pathlib.
 
         Args:
             base_path (str): The root directory to start the search from.
         """
-        tree = dict(metric={}, entity={}, span={}, attribute_group={}, event={}, attribute={})
         start_path = Path(base_path)
         if not start_path.is_dir():
             self.log.error("Directory not found", extra=dict(path=start_path))
-            return tree
+            return
 
         self.path_start = -1
         for file_path in start_path.rglob('*.y[a]ml'):
@@ -41,26 +54,49 @@ class SemanticConventionReader(object):
                 yaml_data = yaml.safe_load(content)
                 if not isinstance(yaml_data, dict):
                     continue
-                groups = yaml_data.get('groups', {})
-                if not groups:
-                    continue
-                for section in groups:
-                    node_type = section.get('type')
-                    if node_type in tree:
-                        key = section['id']
-                        del section['type']
-                        tree[node_type][key] = section
-                    else:
-                        self.add_attribute(tree, section)
+                self.add_groups(yaml_data)
             except yaml.YAMLError as ex:
                 self.log.error("Error parsing YAML file", extra=dict(file_path=file_path, error_message=ex))
             except Exception as ex:
                 self.log.exception(ex, extra=dict(file_path=file_path))
-        return tree
 
-    def add_attribute(self, root: dict, attribute: dict):
+    def add_groups(self, yaml_data):
+        """
+        Process the 'groups' entry from a YAML semantic convention
+
+        :param yaml_data:
+        :return:
+        """
+        for section in yaml_data.get('groups', []):
+            node_type = self.nodetype2node(section)
+            if node_type in self.nodes:
+                key = section['id']
+                del section['type']
+                self.nodes[node_type][key] = section
+                self.relate2attribute(node_type, key, section.get('attributes', []))
+                self.relate2event(key, section.get('events', []))
+            else:
+                self.log.error("Unknown semantic convention", extra=dict(data=section, node_type=node_type))
+
+    # FIXME: AttributeGroup may sometimes have NULL display_name -- fill with id
+    def relate2attribute(self, node_type: str, node: str, attributes: list):
+        rels = self.relations['has_attribute'].setdefault(node_type, [])
+        for data in attributes:
+            if 'ref' in data:
+                attribute_name = data['ref']
+            else:
+                attribute_name = data['id']
+                del data['type']
+                self.nodes['Attribute'][attribute_name] = data
+            rels.append((node, attribute_name))
+
+    def relate2event(self, node: str, events: list):
+        for event_name in events:
+            self.relations['has_event'].append((node, event_name))
+
+    def add_attribute(self, attribute: dict):
         key = attribute['id']
-        all_attributes = root['attribute']
+        all_attributes = self.nodes['Attribute']
         if key in all_attributes:
             self.log.error("Attribute key already exists -- skipping", extra=dict(
                 attribute_name=key, existing_attribute=all_attributes[key],
@@ -116,6 +152,14 @@ def save_node_data_csv(node_type: str, nodes: list, fieldnames: list) -> str:
     return filename
 
 
+def save_rel_data_csv(rel_type: str, relations: list) -> str:
+    filename = f'rel_{rel_type}.csv'
+    with open(filename, 'w') as fd:
+        writer = csv.writer(fd, dialect='unix')
+        writer.writerows(relations)
+    return filename
+
+
 def save_node_data_json(node_type: str, nodes: list) -> str:
     filename = node_type + 's.json'
     with open(filename, 'w') as fd:
@@ -123,10 +167,9 @@ def save_node_data_json(node_type: str, nodes: list) -> str:
     return filename
 
 
-def save_node_data_kuzu(conn: object, node_type: str, filename: str):
+def save_node_data_kuzu(conn: object, table: str, filename: str):
     name2type = dict(attribute_group='AttributeGroup', entity='Entity',
                      metric='Metric', event='Event', span='Span', attribute='Attribute')
-    table = name2type.get(node_type)
     statement = f"COPY {table} FROM '{filename}' (ignore_errors=true)"
     conn.execute(statement)
 
@@ -148,10 +191,20 @@ def create_db_conn(path: str = 'db/semantic_conventions.kuzu',
 if __name__ == '__main__':
     START_PATH = '../semantic-conventions/model'
 
-    reader = SemanticConventionReader(log)
-    conventions = reader.from_dir(START_PATH)
+    conventions = SemanticConventions(log)
+    conventions.from_dir(START_PATH)
 
     conn = create_db_conn()
-    for node_type, data in conventions.items():
+    for node_type, data in conventions.nodes.items():
         filename = save_node_data_json(node_type, list(data.values()))
         save_node_data_kuzu(conn, node_type, filename)
+
+    statement = 'MATCH (n: Attribute) RETURN n;'
+    result = conn.execute(statement)
+    import pdb;
+
+    pdb.set_trace()
+    for node_type, relations in conventions.relations['has_attribute'].items():
+        filename = save_rel_data_csv(node_type + '_attribute', relations)
+        statement = f"COPY HasAttribute FROM '{filename}' (from='{node_type}', to='Attribute')"
+        conn.execute(statement)
