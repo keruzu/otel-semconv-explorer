@@ -53,9 +53,14 @@ CREATE REL TABLE IF NOT EXISTS HasAttribute(
   FROM Entity TO Attribute,
   FROM Span TO Attribute,
   FROM Event TO Attribute
+// requirement_level STRING DEFAULT "recommended",
+// examples STRING DEFAULT ""
 );
 CREATE REL TABLE IF NOT EXISTS HasEvent(
   FROM Span TO Event
+);
+CREATE REL TABLE IF NOT EXISTS AssociatedWith(
+  FROM Metric TO Entity
 );
 
 INSTALL json;

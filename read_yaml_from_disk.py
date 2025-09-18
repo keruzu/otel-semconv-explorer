@@ -23,7 +23,7 @@ class SemanticConventions(object):
         self.reset()
 
     def reset(self):
-        self.relations = dict(has_attribute={}, has_event=[])
+        self.relations = dict(has_attribute={}, has_event={}, AssociatedWith={})
         self.nodes = dict(Metric={}, Entity={}, Span={}, AttributeGroup={}, Event={}, Attribute={})
 
     def nodetype2node(self, section: dict) -> str:
@@ -74,11 +74,17 @@ class SemanticConventions(object):
                 del section['type']
                 self.nodes[node_type][key] = section
                 self.relate2attribute(node_type, key, section.get('attributes', []))
-                self.relate2event(key, section.get('events', []))
+                self.relate2event(node_type, key, section.get('events', []))
+
+                # Special processing
+                if 'entity_associations' in section:
+                    self.relate2associated_entity(node_type, key, section['entity_associations'])
+                if node_type == 'AttributeGroup' and \
+                        'display_name' not in section:
+                    section['display_name'] = key
             else:
                 self.log.error("Unknown semantic convention", extra=dict(data=section, node_type=node_type))
 
-    # FIXME: AttributeGroup may sometimes have NULL display_name -- fill with id
     def relate2attribute(self, node_type: str, node: str, attributes: list):
         rels = self.relations['has_attribute'].setdefault(node_type, [])
         for data in attributes:
@@ -90,9 +96,19 @@ class SemanticConventions(object):
                 self.nodes['Attribute'][attribute_name] = data
             rels.append((node, attribute_name))
 
-    def relate2event(self, node: str, events: list):
+    def relate2associated_entity(self, node_type: str, node: str, entities: list):
+        rels = self.relations['AssociatedWith'].setdefault(node_type, [])
+        for entity in entities:
+            # Evil hack: supposed to search entity table by 'name' or by 'id', which can be different
+            # Choose the id, assume that the difference is that the id name starts with 'entity.'
+            if not entity.startswith('entity'):
+                entity = 'entity.' + entity
+            rels.append((node, entity))
+
+    def relate2event(self, node_type: str, node: str, events: list):
+        rels = self.relations['has_event'].setdefault(node_type, [])
         for event_name in events:
-            self.relations['has_event'].append((node, event_name))
+            rels.append((node, event_name))
 
     def add_attribute(self, attribute: dict):
         key = attribute['id']
@@ -119,37 +135,6 @@ class SemanticConventions(object):
         parts.append(final)
         key_name = '.'.join(parts)
         return key_name
-
-
-fieldnamesByType = dict(
-    attribute_group=['id', 'metric_name', 'extends', 'entity_associations',
-                     'annotations', 'stability', 'brief', 'deprecated',
-                     'instrument', 'unit', 'note', 'attributes', 'name',
-                     'span_kind', 'events', 'display_name', 'body'],
-    attribute=['id', 'metric_name', 'extends', 'entity_associations',
-               'annotations', 'stability', 'brief', 'deprecated',
-               'instrument', 'unit', 'note', 'attributes', 'name',
-               'span_kind', 'events', 'display_name', 'body'],
-    span=['id', 'metric_name', 'extends', 'entity_associations',
-          'annotations', 'stability', 'brief', 'deprecated',
-          'instrument', 'unit', 'note', 'attributes', 'name',
-          'span_kind', 'events', 'display_name', 'body'],
-    event=['id', 'stability', 'brief', 'name', ],
-    metric=['id', 'metric_name', 'stability', 'brief',
-            'instrument', 'unit', ],
-
-    entity=['id', 'stability', 'brief', ],
-)
-
-
-def save_node_data_csv(node_type: str, nodes: list, fieldnames: list) -> str:
-    filename = node_type + 's.csv'
-    with open(filename, 'w') as fd:
-        writer = csv.DictWriter(fd, dialect='unix',
-                                fieldnames=fieldnames, extrasaction='ignore')
-        writer.writeheader()
-        writer.writerows(nodes)
-    return filename
 
 
 def save_rel_data_csv(rel_type: str, relations: list) -> str:
@@ -199,12 +184,23 @@ if __name__ == '__main__':
         filename = save_node_data_json(node_type, list(data.values()))
         save_node_data_kuzu(conn, node_type, filename)
 
-    statement = 'MATCH (n: Attribute) RETURN n;'
-    result = conn.execute(statement)
-    import pdb;
-
-    pdb.set_trace()
+    # statement = 'MATCH (n: Attribute) RETURN n;'
+    # result = conn.execute(statement)
     for node_type, relations in conventions.relations['has_attribute'].items():
         filename = save_rel_data_csv(node_type + '_attribute', relations)
         statement = f"COPY HasAttribute FROM '{filename}' (from='{node_type}', to='Attribute')"
-        conn.execute(statement)
+        try:
+            conn.execute(statement)
+        except Exception as ex:
+            print(f"{ex} {statement}")
+            import pdb;
+
+            pdb.set_trace()
+
+    for node_type, relations in conventions.relations['AssociatedWith'].items():
+        filename = save_rel_data_csv(node_type + '_entity_association', relations)
+        statement = f"COPY AssociatedWith FROM '{filename}' (from='{node_type}', to='Entity')"
+        try:
+            conn.execute(statement)
+        except Exception as ex:
+            print(f"{ex} {statement}")
