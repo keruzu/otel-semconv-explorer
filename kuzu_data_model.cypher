@@ -52,9 +52,12 @@ CREATE REL TABLE IF NOT EXISTS HasAttribute(
   FROM Metric TO Attribute,
   FROM Entity TO Attribute,
   FROM Span TO Attribute,
-  FROM Event TO Attribute
-// requirement_level STRING DEFAULT "recommended",
-// examples STRING DEFAULT ""
+  FROM Event TO Attribute,
+  requirement_level STRING DEFAULT "recommended",
+  note STRING DEFAULT "",
+  condition STRING DEFAULT "",
+  brief STRING DEFAULT "",
+  examples STRING DEFAULT ""
 );
 CREATE REL TABLE IF NOT EXISTS HasEvent(
   FROM Span TO Event

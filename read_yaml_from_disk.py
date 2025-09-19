@@ -88,13 +88,28 @@ class SemanticConventions(object):
     def relate2attribute(self, node_type: str, node: str, attributes: list):
         rels = self.relations['has_attribute'].setdefault(node_type, [])
         for data in attributes:
+            edge_info = {'from': node}
             if 'ref' in data:
-                attribute_name = data['ref']
+                edge_info['to'] = data['ref']
+                del data['ref']
+                requirement = data.get('requirement_level')
+                if isinstance(requirement, dict):
+                    if 'conditionally_required' in requirement:
+                        data['condition'] = requirement['conditionally_required']
+                        data['requirement_level'] = 'conditionally_required'
+                    if 'recommended' in requirement:
+                        data['condition'] = requirement['recommended']
+                        data['requirement_level'] = 'recommended'
+                if 'examples' in data:
+                    # Sometimes get numeric values in examples
+                    data['examples'] = '\n'.join(str(x) for x in data['examples'])
+                edge_info.update(data)
             else:
                 attribute_name = data['id']
                 del data['type']
                 self.nodes['Attribute'][attribute_name] = data
-            rels.append((node, attribute_name))
+                edge_info['to'] = attribute_name
+            rels.append(edge_info)
 
     def relate2associated_entity(self, node_type: str, node: str, entities: list):
         rels = self.relations['AssociatedWith'].setdefault(node_type, [])
@@ -145,6 +160,13 @@ def save_rel_data_csv(rel_type: str, relations: list) -> str:
     return filename
 
 
+def save_rel_data_json(node_type: str, rel_type: str, relations: list) -> str:
+    filename = f'rel_{node_type}_{rel_type}.json'
+    with open(filename, 'w') as fd:
+        json.dump(relations, fd)
+    return filename
+
+
 def save_node_data_json(node_type: str, nodes: list) -> str:
     filename = node_type + 's.json'
     with open(filename, 'w') as fd:
@@ -187,7 +209,7 @@ if __name__ == '__main__':
     # statement = 'MATCH (n: Attribute) RETURN n;'
     # result = conn.execute(statement)
     for node_type, relations in conventions.relations['has_attribute'].items():
-        filename = save_rel_data_csv(node_type + '_attribute', relations)
+        filename = save_rel_data_json(node_type, 'attribute', relations)
         statement = f"COPY HasAttribute FROM '{filename}' (from='{node_type}', to='Attribute')"
         try:
             conn.execute(statement)
