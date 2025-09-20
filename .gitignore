@@ -2,3 +2,4 @@
 *.json
 *.csv
 venv
+db
