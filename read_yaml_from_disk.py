@@ -200,21 +200,21 @@ class PersistenceKuzu(SemanticConventions):
         super().__init__(*args, **kwargs)
         self.conn = None
 
-    def create_db(self, path: str = 'db/semantic_conventions.kuzu',
-                  schema_file: str = 'kuzu_data_model.cypher'):
+    def create_db(self, filename: str = 'db/semantic_conventions.kuzu',
+                  schema_file: str = 'kuzu_schema.cypher'):
         """
         Create the database, optionally with a Cypher definition file
 
-        :param path:
+        :param filename: path and filename of the Kuzu database file
         :param schema_file: Cypher definition file with CREATE statements
         """
-        db = kuzu.Database(path)
+        db = kuzu.Database(filename)
         self.conn = kuzu.Connection(db)
         self.set_schema(schema_file)
 
-    def set_schema(self, schema_file: str = 'kuzu_data_model.cypher'):
+    def set_schema(self, schema_file: str = 'kuzu_schema.cypher'):
         """
-        Use model file, if specified, to take the Cypher defintion to
+        Use model file, if specified, to take the Cypher definition to
         define the schema
 
         :param schema_file: Cypher definition file with CREATE statements
