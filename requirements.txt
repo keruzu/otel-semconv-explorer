@@ -1,0 +1,6 @@
+requests
+pyflakes
+flake8
+kuzu
+python-json-logger
+pyyaml

@@ -182,6 +182,16 @@ class SemanticConventions(object):
         else:
             all_attributes[key] = attribute
 
+    def save_import_file(self, filename: str, db_objects: list):
+        """
+        Store the intermediate statements as JSON for later import
+
+        :param filename: importable file name
+        :param db_objects: list of objects to persist
+        """
+        with open(filename, 'w') as fd:
+            json.dump(db_objects, fd)
+
 
 class PersistenceKuzu(SemanticConventions):
     """
@@ -248,16 +258,6 @@ class PersistenceKuzu(SemanticConventions):
                 self.save_import_file(filename, relations)
                 statement = f"COPY {rel_name} FROM '{filename}' (from='{node_type}', to='{rel_endpoint}')"
                 self.execute(statement)
-
-    def save_import_file(self, filename: str, db_objects: list):
-        """
-        Store the intermediate statements as JSON for later import
-
-        :param filename: importable file name
-        :param db_objects: list of objects to persist
-        """
-        with open(filename, 'w') as fd:
-            json.dump(db_objects, fd)
 
     def execute(self, statement: str, pdb_on_error: bool = False):
         """
