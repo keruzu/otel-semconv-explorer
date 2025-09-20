@@ -1,3 +1,10 @@
+"""
+Open Telemetry Semantic Conventions
+
+* [Documentation](https://opentelemetry.io/docs/concepts/semantic-conventions/)
+* [Definitions of the conventions](https://github.com/open-telemetry/semantic-conventions/tree/main/model)
+
+"""
 import json
 import logging
 from pathlib import Path
@@ -14,6 +21,11 @@ log = logging.getLogger()
 
 
 class SemanticConventions(object):
+    """
+    Open Telemetry Semantic Conventions
+    Describes the nodes and relationships in the conventions
+    """
+
     def __init__(self, log=None):
         self.path_start = -1
         self.log = log
@@ -40,6 +52,9 @@ class SemanticConventions(object):
     def import_conventions_from_dir(self, base_path: str):
         """
         Reads all semantic convention YAML files in a given directory and its subdirectories.
+        Assumes the conventions from file structures from
+
+        https://github.com/open-telemetry/semantic-conventions/tree/main/model
 
         Args:
             base_path (str): The root directory to start the search from.
@@ -153,33 +168,28 @@ class SemanticConventions(object):
             rels.append(edge_info)
 
     def add_attribute(self, attribute: dict):
+        """
+        Record the attribute as a first-class node
+
+        :param attribute:
+        """
         key = attribute['id']
         all_attributes = self.nodes['Attribute']
         if key in all_attributes:
             self.log.error("Attribute key already exists -- skipping", extra=dict(
                 attribute_name=key, existing_attribute=all_attributes[key],
-                incoming_attribute=attribute
-            ))
+                incoming_attribute=attribute))
         else:
             all_attributes[key] = attribute
 
-    def generate_key_name(self, data: dict, file_path: Path) -> str:
-        prefix = data[0].get('type', '_')
-        if self.path_start == -1:
-            model_dir = file_path.parts
-            if 'model' in model_dir:
-                self.path_start = model_dir.index('model') + 1
-            else:
-                self.path_start = 0
-        final = file_path.stem
-        parts = list(file_path.parts[self.path_start:-1])
-        parts.insert(0, prefix)
-        parts.append(final)
-        key_name = '.'.join(parts)
-        return key_name
-
 
 class PersistenceKuzu(SemanticConventions):
+    """
+    Use the Kuzu graph database to persist semantic conventions
+
+    https://kuzudb.com/
+    """
+
     relation2node = {
         'HasAttribute': 'Attribute',
         'HasEvent': 'Event',
@@ -191,11 +201,26 @@ class PersistenceKuzu(SemanticConventions):
         self.conn = None
 
     def create_db(self, path: str = 'db/semantic_conventions.kuzu',
-                  model_file: str = 'kuzu_data_model.cypher'):
+                  schema_file: str = 'kuzu_data_model.cypher'):
+        """
+        Create the database, optionally with a Cypher definition file
+
+        :param path:
+        :param schema_file: Cypher definition file with CREATE statements
+        """
         db = kuzu.Database(path)
         self.conn = kuzu.Connection(db)
-        if model_file:
-            with open(model_file) as fd:
+        self.set_schema(schema_file)
+
+    def set_schema(self, schema_file: str = 'kuzu_data_model.cypher'):
+        """
+        Use model file, if specified, to take the Cypher defintion to
+        define the schema
+
+        :param schema_file: Cypher definition file with CREATE statements
+        """
+        if schema_file:
+            with open(schema_file) as fd:
                 model_data = fd.read()
             statements = model_data.split(';')
             for statement in statements:
@@ -203,6 +228,9 @@ class PersistenceKuzu(SemanticConventions):
                     self.execute(statement)
 
     def persist_nodes(self):
+        """
+        Save node data in the database
+        """
         for node_type, data in self.nodes.items():
             filename = node_type + 's.json'
             self.save_import_file(filename, list(data.values()))
@@ -210,6 +238,9 @@ class PersistenceKuzu(SemanticConventions):
             self.execute(statement)
 
     def persist_relations(self):
+        """
+        Save relations data in the database
+        """
         for rel_name, rel_data in self.relations.items():
             rel_endpoint = self.relation2node.get(rel_name)
             for node_type, relations in rel_data.items():
@@ -218,15 +249,31 @@ class PersistenceKuzu(SemanticConventions):
                 statement = f"COPY {rel_name} FROM '{filename}' (from='{node_type}', to='{rel_endpoint}')"
                 self.execute(statement)
 
-    def save_import_file(self, filename: str, nodes: list):
-        with open(filename, 'w') as fd:
-            json.dump(nodes, fd)
+    def save_import_file(self, filename: str, db_objects: list):
+        """
+        Store the intermediate statements as JSON for later import
 
-    def execute(self, statement: str):
+        :param filename: importable file name
+        :param db_objects: list of objects to persist
+        """
+        with open(filename, 'w') as fd:
+            json.dump(db_objects, fd)
+
+    def execute(self, statement: str, pdb_on_error: bool = False):
+        """
+        Execute the Cypher statement in the database
+
+        :param statement: Cypher statement
+        :param pdb_on_error: On error, run the interactive Python DeBugger (pdb)
+        :return:
+        """
         try:
             self.conn.execute(statement)
         except Exception as ex:
             print(f"{ex} {statement}")
+            if pdb_on_error:
+                import pdb
+                pdb.set_trace()
 
 
 if __name__ == '__main__':
