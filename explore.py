@@ -53,8 +53,9 @@ def _(mo):
     ## Import the Data
 
     Here's how to import the data
-
+    ```
         COPY Metric from 'metrics.json'
+    ```
     """
     )
     return
@@ -160,19 +161,51 @@ def _(conventions):
 def _(mo):
     mo.md(
         r"""
+    ## Kuzu Explorer
+    From the [Kuzu website](https://docs.kuzudb.com/visualization/kuzu-explorer/)
+
+    > Kuzu Explorer is a browser-based frontend to visualize and explore Kuzu database schemas
+    > and query results in the form of a graph, table, or JSON. This is a useful tool for exploring 
+    > your graph data and debugging your data model during the prototyping phase.
+
+    You can point the Kuzu explorer on the graph datbase with the following command🥇
+
+    ```bash
+    podman run -it -p 8000:8000 -v `pwd`/db:/database -e KUZU_FILE=semantic_conventions.kuzu kuzudb/explorer:latest
+    ```
+
+    """
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(
+        r"""
     ## Examples
     ### Show tables
 
     Here's the command to show all of the tables:
-
+    ```
         CALL show_tables() RETURN *;
-
+    ```
 
 
     ### Show All Rows in Table
 
+    ```
         MATCH (n: Metric)
         RETURN n;
+    ```
+    ### Show Interesting Attributes
+    Find all attributes related to `http`
+
+    ```
+    MATCH (a: Attribute)
+    WHERE a.brief CONTAINS 'http' OR a.note CONTAINS 'http' OR a.id CONTAINS 'http'
+    RETURN a LIMIT 5;
+    ```
     """
     )
     return
