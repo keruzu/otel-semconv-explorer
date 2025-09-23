@@ -131,6 +131,9 @@ class SemanticConventions(object):
             else:
                 attribute_name = data['id']
                 del data['type']
+                if 'examples' in data:
+                    # Sometimes get numeric values in examples
+                    data['examples'] = '\n'.join(str(x) for x in data['examples'])
                 self.nodes['Attribute'][attribute_name] = data
                 edge_info['to'] = attribute_name
             rels.append(edge_info)
@@ -178,8 +181,12 @@ class SemanticConventions(object):
         if key in all_attributes:
             self.log.error("Attribute key already exists -- skipping", extra=dict(
                 attribute_name=key, existing_attribute=all_attributes[key],
-                incoming_attribute=attribute))
+                incoming_attrib# attributes = attributes.drop(['attributes', 'entity_associations'])
+ute=attribute))
         else:
+            if 'examples' in attribute:
+                # Sometimes get numeric values in examples
+                attribute['examples'] = '\n'.join(str(x) for x in attribute['examples'])
             all_attributes[key] = attribute
 
     def save_import_file(self, filename: str, db_objects: list):
