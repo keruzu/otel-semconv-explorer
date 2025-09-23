@@ -181,8 +181,7 @@ class SemanticConventions(object):
         if key in all_attributes:
             self.log.error("Attribute key already exists -- skipping", extra=dict(
                 attribute_name=key, existing_attribute=all_attributes[key],
-                incoming_attrib# attributes = attributes.drop(['attributes', 'entity_associations'])
-ute=attribute))
+                incoming_attribute=attribute))
         else:
             if 'examples' in attribute:
                 # Sometimes get numeric values in examples
@@ -218,6 +217,7 @@ class PersistenceKuzu(SemanticConventions):
         self.conn = None
 
     def create_db(self, filename: str = 'db/semantic_conventions.kuzu',
+                  mode=755,
                   schema_file: str = 'kuzu_schema.cypher'):
         """
         Create the database, optionally with a Cypher definition file
@@ -225,6 +225,10 @@ class PersistenceKuzu(SemanticConventions):
         :param filename: path and filename of the Kuzu database file
         :param schema_file: Cypher definition file with CREATE statements
         """
+        # Create a path for the directory to exist
+        path = Path(filename)
+        path.parent.mkdir(mode=mode, parents=True, exist_ok=True)
+
         db = kuzu.Database(filename)
         self.conn = kuzu.Connection(db)
         self.set_schema(schema_file)

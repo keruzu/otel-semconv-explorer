@@ -171,7 +171,10 @@ def _(mo):
     You can point the Kuzu explorer on the graph datbase with the following command🥇
 
     ```bash
-    podman run -it -p 8000:8000 -v `pwd`/db:/database -e KUZU_FILE=semantic_conventions.kuzu kuzudb/explorer:latest
+    podman run -it -p 8000:8000 -v `pwd`/db:/database \
+           -e KUZU_FILE=semantic_conventions.kuzu \
+           -e MODE=READ_ONLY \
+           kuzudb/explorer:latest
     ```
 
     """
