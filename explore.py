@@ -16,8 +16,7 @@ def _(mo):
     This means that any backend observability tool can consume the standard these observability signals (ie metrics, events, logs, traces, profiles) and know that
     everyone else uses the same units of measure, the same dimensions and the same documentation in dashboards and traces.
 
-    ![Graph schema](graph_schema.png "Graph schema")
-
+    ![Graph schema](public/graph_schema.png)
     """
     )
     return
@@ -78,7 +77,6 @@ def _(conventions, mo):
         "relations": list(conventions.relations.keys())
     }
     mo.tree(data, label="Graph Nodes")
-
     return
 
 
@@ -111,7 +109,12 @@ def _(mo):
     mo.md(
         r"""
     ## Attributes
-    Attributes are dimensional data that allow us to express a specific metric time series. In most observability products, the number of dimensions (aka cardinality) directly impacts storage and costs.
+    Attributes are dimensional data that allow us to enrich a specific piece of signal data (eg a metric). In most observability products, the number of dimensions (aka cardinality) directly impacts storage and costs.
+
+    While more dimensions can produce better results, it can also become the 
+    [*Curse of Dimensionality*](https://en.wikipedia.org/wiki/Curse_of_dimensionality) where the sheer
+    amount of data leads to increased compute / memory / storage / network costs and reduced generalizability of
+    results using that data.
     """
     )
     return
@@ -133,7 +136,24 @@ def _(DataFrame, conventions):
 
 
 @app.cell
-def _():
+def _(mo):
+    mo.md(
+        r"""
+    ## Entities
+    One or more entities are grouped in a Resource, and are sent once to the backend system.
+    This is in contrast to signal-level attributes (eg metric) where the dimensions are sent for every data point.
+
+    Note that the cardinality stored in the time series is the same -- it is the sum of the attributes at the
+    resource level and at the signal level.
+    """
+    )
+    return
+
+
+@app.cell
+def _(conventions):
+    entities_json = list(conventions.nodes['Entity'].values())
+    entities_json
     return
 
 
@@ -153,7 +173,6 @@ def _(conventions):
     conventions.create_db()
     conventions.persist_nodes()
     conventions.persist_relations()
-
     return
 
 
@@ -176,7 +195,6 @@ def _(mo):
            -e MODE=READ_ONLY \
            kuzudb/explorer:latest
     ```
-
     """
     )
     return
@@ -211,6 +229,30 @@ def _(mo):
     ```
     """
     )
+    return
+
+
+@app.cell
+def _(conventions):
+    query_term = 'log'
+    statement = f"""
+    MATCH (a: Attribute)
+    WHERE a.brief CONTAINS '{query_term}' OR a.note CONTAINS '{query_term}' OR a.id CONTAINS '{query_term}'
+    RETURN a LIMIT 5;
+    """
+    result = conventions.conn.execute(statement)
+    result
+    return (result,)
+
+
+@app.cell
+def _(result):
+    result.get_all()
+    return
+
+
+@app.cell
+def _():
     return
 
 
