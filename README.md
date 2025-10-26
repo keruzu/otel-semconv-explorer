@@ -4,7 +4,7 @@
 
 1. Clone this repo.
 2. Install pre-requisites: eg `python -m venv venv; source venv/bin/activate; pip install -r requirements.txt`
-2. Run `python main.py` on the root level.
+2. Run `python explore.py` on the root level.
 3. Open your browser to `http://127.0.0.1:5000/graphql`.
 
 ## Kuzu DB References
