@@ -9,14 +9,36 @@ def _(mo):
     mo.md(
         r"""
     # OpenTelemetry Semantic Conventions
+    The OpenTelemetry project is an attempt to commoditize the collection and processing 
+    (ie the Extract / Transform / Load) of data to be used for describing the behaviour of systems.
+
+    ![Graph schema](public/graph_schema.png)
+
+    ## About the Diagram
+    The above diagram is from the graph database [Kuzu](https://github.com/kuzudb/kuzu/) which is in
+    the process of doing something else. Everything here still works (October 2025), but may not in the future.
+
+    One of the downfalls of Internet-speed.
+
+    ## OpenTelemetry Signals
+    We can loosely define a `signal` (in the OpenTelemetry context) as
+
+    * **Metric**: numerical data (counter, gauge, etc) at a moment in time
+    * **Log**: a message from a system
+    * **Trace**: a series of connected messages (from multiple systems as well as from multiple locations in the same program), linked hierarchically by a trace id
+    * **Profile**: data about the execution of a program, such as memory usage, invocation count and run-time\
+
+    At this point (2025), profiling (aka continuous profiling) is rather new, so some details are being worked out.
+
+    Adding Cilium Hubble-style network events (like Netflow data) could potentially be another OpenTelemetry signal later on.
+
+    ## About the Semantic Conventions
     The [Open Telemetry Semantic Conventions](https://opentelemetry.io/docs/concepts/semantic-conventions/)
     [define](https://github.com/open-telemetry/semantic-conventions/tree/main/model)
     the various metrics and spans, and provide common attributes (aka "dimensions").
 
     This means that any backend observability tool can consume the standard these observability signals (ie metrics, events, logs, traces, profiles) and know that
     everyone else uses the same units of measure, the same dimensions and the same documentation in dashboards and traces.
-
-    ![Graph schema](public/graph_schema.png)
     """
     )
     return
@@ -154,6 +176,20 @@ def _(mo):
 def _(conventions):
     entities_json = list(conventions.nodes['Entity'].values())
     entities_json
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(
+        r"""
+    # Relations
+    The links between the nodes ('edges') define the relationships to other items.
+    ## HasAttribute
+    By far the most common relation between semantic convention nodes is the `HasAttribute` relationship.
+    This associates a set of dimensions with a metric, log or trace,
+    """
+    )
     return
 
 
